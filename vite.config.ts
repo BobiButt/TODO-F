@@ -55,7 +55,7 @@ export default defineConfig(({ mode }): UserConfig => {
       strictPort: false,
       proxy: {
         "/api": {
-          target: env.VITE_DEV_API_TARGET || "http://localhost:8000",
+          target: env.VITE_DEV_API_TARGET || "https://todo-b-nu.vercel.app",
           changeOrigin: true,
         },
       },
@@ -67,7 +67,7 @@ export default defineConfig(({ mode }): UserConfig => {
       port: 4173,
       proxy: {
         "/api": {
-          target: env.VITE_DEV_API_TARGET || "http://localhost:8000",
+          target: env.VITE_DEV_API_TARGET || "https://todo-b-nu.vercel.app/",
           changeOrigin: true,
         },
       },
