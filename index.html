@@ -1,0 +1,41 @@
+<!doctype html>
+<!-- ======================================================================== -->
+<!-- FILE:       frontend/index.html                                          -->
+<!-- PURPOSE:    HTML entry shell for the TaskFlow Single Page Application.  -->
+<!-- HOW IT WORKS: Vite mounts the React application into the #root div.      -->
+<!-- USED BY / DEPENDS ON: src/main.tsx, Vite bundler.                         -->
+<!-- KEY CONCEPTS: SPA mounting, viewport setup, web fonts, dark class default.-->
+<!-- ======================================================================== -->
+<html lang="en" class="dark">
+  <head>
+    <!-- Document character set encoding. -->
+    <meta charset="UTF-8" />
+
+    <!-- Favicon link. -->
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%236366f1' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='m9 11 3 3L22 4'/><path d='M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11'/></svg>" />
+
+    <!-- Responsive viewport scaling. -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <!-- SEO Meta Description. -->
+    <meta name="description" content="TaskFlow is a production-quality full-stack Todo application with role-based permissions, subtask checklists, task comments, and CSV/JSON transfer." />
+
+    <!-- Page Title. -->
+    <title>TaskFlow — Assisted Workspace</title>
+
+    <!-- Google Fonts: Inter and Outfit for typography. -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@500;600;700;800&display=swap" rel="stylesheet" />
+
+    <!-- Google Identity Services for Sign-In with Google -->
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+  </head>
+  <body class="antialiased selection:bg-emerald-400/20 selection:text-emerald-100">
+    <!-- React application mount target. -->
+    <div id="root"></div>
+
+    <!-- Vite module entry point. -->
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

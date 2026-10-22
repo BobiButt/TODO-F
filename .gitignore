@@ -1,0 +1,25 @@
+# --- Dependencies ---------------------------------------------------------
+node_modules/
+.pnpm-store/
+
+# --- Build output ---------------------------------------------------------
+dist/
+.vite/
+*.tsbuildinfo
+vite.config.js
+vite.config.d.ts
+
+# --- Local environment ----------------------------------------------------
+.env
+.env.local
+.env.*.local
+
+# --- Logs -----------------------------------------------------------------
+*.log
+npm-debug.log*
+
+# --- Editor / OS noise ----------------------------------------------------
+.vscode/
+.idea/
+*.swp
+.DS_Store
