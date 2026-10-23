@@ -19,10 +19,27 @@ interface ImportMetaEnv {
   readonly VITE_API_BASE_URL?: string;
   /** Target used by the dev/preview proxy to reach a local backend. */
   readonly VITE_DEV_API_TARGET?: string;
+  /** Google OAuth client ID for "Sign in with Google" (Google Cloud Console). */
+  readonly VITE_GOOGLE_CLIENT_ID?: string;
   /** Vite build mode ("development" | "production"). */
   readonly VITE_APP_ENV?: string;
 }
 
 interface ImportMeta {
   readonly env: ImportMetaEnv;
+}
+
+declare interface Window {
+  google?: {
+    accounts: {
+      id: {
+        initialize: (config: Record<string, unknown>) => void;
+        renderButton: (
+          element: HTMLElement,
+          options: Record<string, unknown>,
+        ) => void;
+        prompt: () => void;
+      };
+    };
+  };
 }
