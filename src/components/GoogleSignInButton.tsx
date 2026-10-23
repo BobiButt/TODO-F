@@ -1,15 +1,8 @@
 // ============================================================================
 // FILE:       frontend/src/components/GoogleSignInButton.tsx
-// PURPOSE:    Renders the official Google "Sign in with Google" button using
-//             Google Identity Services and exchanges the returned ID token for a
-//             TaskFlow JWT via the /auth/google endpoint.
-// HOW IT WORKS: Waits for the gsi/client script (loaded in index.html) to expose
-//             `window.google.accounts.id`, initializes it with the configured
-//             client ID, renders the native Google button, and on credential
-//             response calls `googleSignIn` then restores the session.
-// USED BY / DEPENDS ON: src/pages/AuthPages.tsx (Login & Register).
-// NOTE:       Set VITE_GOOGLE_CLIENT_ID and add your origins to Google Cloud
-//             Console (https://todo-app-six-phi-88.vercel.app, http://localhost:5173).
+// PURPOSE:    Renders the official Google "Sign in with Google" button.
+// FIXES:      * uses VITE_GOOGLE_CLIENT_ID (Vite only exposes VITE_* vars)
+//             * numeric width (Google rejects "100%")
 // ============================================================================
 
 import { useEffect, useRef, useState } from "react";
@@ -23,18 +16,15 @@ interface GoogleSignInButtonProps {
   className?: string;
 }
 
-/**
- * Official Google Sign-In button. Requires VITE_GOOGLE_CLIENT_ID.
- */
 export function GoogleSignInButton({ className }: GoogleSignInButtonProps = {}) {
   const { login } = useAuth();
   const navigate = useNavigate();
-  const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+  // FIX: Vite requires the VITE_ prefix to expose env vars to the client.
+  const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID as string | undefined;
   const ref = useRef<HTMLDivElement>(null);
   const [ready, setReady] = useState(false);
   const initialized = useRef(false);
 
-  // Poll until Google Identity Services exposes `window.google.accounts.id`.
   useEffect(() => {
     const timer = setInterval(() => {
       if (window.google?.accounts?.id) {
@@ -45,7 +35,6 @@ export function GoogleSignInButton({ className }: GoogleSignInButtonProps = {}) 
     return () => clearInterval(timer);
   }, []);
 
-  // Initialize GIS once and render the native Google button into the ref element.
   useEffect(() => {
     if (!ready || !clientId || initialized.current || !ref.current) return;
     if (!window.google?.accounts?.id) return;
@@ -59,7 +48,8 @@ export function GoogleSignInButton({ className }: GoogleSignInButtonProps = {}) 
     window.google.accounts.id.renderButton(ref.current, {
       theme: "outline",
       size: "large",
-      width: "100%",
+      // FIX: Google's API rejects "100%"; it needs a pixel number.
+      width: 320,
       text: "signin_with",
       shape: "rectangular",
       logo_alignment: "left",

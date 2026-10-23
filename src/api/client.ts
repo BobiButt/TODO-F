@@ -76,6 +76,9 @@ export async function apiRequest<T>(endpoint: string, options: RequestInit = {})
 
   // Handle 401 Unauthorized — token invalid or expired.
   if (response.status === 401) {
+    // FIX: clear the stale token so the app drops back to unauthenticated
+    // state and RoleContext stops re-fetching.
+    setAuthToken(null);
     throw new Error("Session expired. Please log in again.");
   }
 
