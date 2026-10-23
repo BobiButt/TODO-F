@@ -1,8 +1,5 @@
 // ============================================================================
 // FILE:       frontend/src/components/GoogleSignInButton.tsx
-// PURPOSE:    Renders the official Google "Sign in with Google" button.
-// FIXES:      * uses VITE_GOOGLE_CLIENT_ID (Vite only exposes VITE_* vars)
-//             * numeric width (Google rejects "100%")
 // ============================================================================
 
 import { useEffect, useRef, useState } from "react";
@@ -12,6 +9,9 @@ import { setAuthToken } from "@/api/client";
 import { useAuth } from "@/context/AuthContext";
 import { toast } from "sonner";
 
+// Module-level flag to prevent double initialization across multiple component instances
+let isGoogleInitialized = false;
+
 interface GoogleSignInButtonProps {
   className?: string;
 }
@@ -19,11 +19,9 @@ interface GoogleSignInButtonProps {
 export function GoogleSignInButton({ className }: GoogleSignInButtonProps = {}) {
   const { login } = useAuth();
   const navigate = useNavigate();
-  // FIX: Vite requires the VITE_ prefix to expose env vars to the client.
   const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID as string | undefined;
   const ref = useRef<HTMLDivElement>(null);
   const [ready, setReady] = useState(false);
-  const initialized = useRef(false);
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -36,9 +34,12 @@ export function GoogleSignInButton({ className }: GoogleSignInButtonProps = {}) 
   }, []);
 
   useEffect(() => {
-    if (!ready || !clientId || initialized.current || !ref.current) return;
+    if (!ready || !clientId || !ref.current) return;
     if (!window.google?.accounts?.id) return;
-    initialized.current = true;
+    
+    // FIX: Check both local state and global flag to stop multiple initializations
+    if (isGoogleInitialized) return;
+    isGoogleInitialized = true;
 
     window.google.accounts.id.initialize({
       clientId,
@@ -48,7 +49,6 @@ export function GoogleSignInButton({ className }: GoogleSignInButtonProps = {}) 
     window.google.accounts.id.renderButton(ref.current, {
       theme: "outline",
       size: "large",
-      // FIX: Google's API rejects "100%"; it needs a pixel number.
       width: 320,
       text: "signin_with",
       shape: "rectangular",
