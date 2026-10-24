@@ -72,6 +72,8 @@ export function GoogleSignInButton({ className }: GoogleSignInButtonProps = {}) 
     }
   };
 
+  console.log("Google Client ID:", clientId);
+
   if (!clientId) {
     return (
       <button
