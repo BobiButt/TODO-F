@@ -9,9 +9,6 @@ import { setAuthToken } from "@/api/client";
 import { useAuth } from "@/context/AuthContext";
 import { toast } from "sonner";
 
-// Module-level flag to prevent double initialization across multiple component instances
-let isGoogleInitialized = false;
-
 interface GoogleSignInButtonProps {
   className?: string;
 }
@@ -22,6 +19,8 @@ export function GoogleSignInButton({ className }: GoogleSignInButtonProps = {}) 
   const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID as string | undefined;
   const ref = useRef<HTMLDivElement>(null);
   const [ready, setReady] = useState(false);
+  // Per-instance ref so React Strict Mode (mount → unmount → remount) resets it.
+  const isInitialized = useRef(false);
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -36,15 +35,15 @@ export function GoogleSignInButton({ className }: GoogleSignInButtonProps = {}) 
   useEffect(() => {
     if (!ready || !clientId || !ref.current) return;
     if (!window.google?.accounts?.id) return;
-    
-    // FIX: Check both local state and global flag to stop multiple initializations
-    if (isGoogleInitialized) return;
-    isGoogleInitialized = true;
 
-    window.google.accounts.id.initialize({
-      clientId,
-      callback: handleCredentialResponse,
-    });
+    // Only initialize once per instance; re-render the button on every mount.
+    if (!isInitialized.current) {
+      isInitialized.current = true;
+      window.google.accounts.id.initialize({
+        clientId,
+        callback: handleCredentialResponse,
+      });
+    }
 
     window.google.accounts.id.renderButton(ref.current, {
       theme: "outline",

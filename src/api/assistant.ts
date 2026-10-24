@@ -1,4 +1,5 @@
 import { apiRequest } from "@/api/client";
+import { toast } from "sonner";
 
 export interface AssistantMessage {
   role: "user" | "assistant";
@@ -27,9 +28,27 @@ export interface AssistantResponse {
   diagnostics?: AssistantDiagnostic[];
 }
 
+/** Max time (ms) to wait for the assistant before aborting. Vercel functions die at 10s. */
+const ASSISTANT_TIMEOUT_MS = 9000;
+
 export function sendAssistantMessage(messages: AssistantMessage[]): Promise<AssistantResponse> {
-  return apiRequest<AssistantResponse>("/assistant/chat", {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), ASSISTANT_TIMEOUT_MS);
+
+  const promise = apiRequest<AssistantResponse>("/assistant/chat", {
     method: "POST",
     body: JSON.stringify({ messages }),
+    signal: controller.signal,
   });
+
+  // Clear the timeout once the request settles (success or failure).
+  const settled = promise.finally(() => clearTimeout(timeoutId));
+
+  settled.catch((error) => {
+    if (error instanceof Error && error.name === "AbortError") {
+      toast.error("AI is taking too long to respond. Please try a shorter prompt.");
+    }
+  });
+
+  return settled;
 }

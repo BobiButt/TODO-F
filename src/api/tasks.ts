@@ -116,13 +116,16 @@ export async function restoreTask(taskId: number): Promise<Task> {
 
 /**
  * Toggle task status between completed and pending.
+ * Sends PATCH /api/v1/tasks/{taskId} with { "completed": true|false }.
  *
  * @param {number} taskId - ID of task to toggle.
+ * @param {boolean} completed - Desired completion state.
  * @returns {Promise<Task>} Updated task.
  */
-export async function toggleTaskStatus(taskId: number): Promise<Task> {
-  return apiRequest<Task>(`/tasks/${taskId}/toggle`, {
+export async function toggleTaskStatus(taskId: number, completed: boolean): Promise<Task> {
+  return apiRequest<Task>(`/tasks/${taskId}`, {
     method: "PATCH",
+    body: JSON.stringify({ completed }),
   });
 }
 

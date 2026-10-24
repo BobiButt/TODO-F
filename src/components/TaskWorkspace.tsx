@@ -123,29 +123,96 @@ export function TaskWorkspace({ isAdmin, currentUserId, users }: TaskWorkspacePr
       tags: draft.tags.split(",").map((tag) => tag.trim()).filter(Boolean),
       category: draft.category.trim() || null,
     };
-    try {
-      if (editingId) {
-        await updateTask(editingId, payload);
-        toast.success("Task updated.");
-      } else {
-        await createTask(payload);
-        toast.success("Task created.");
-      }
+
+    // --- Optimistic UI snapshot for rollback ---
+    const prevTasks = tasks;
+    const prevEditingId = editingId;
+    const prevDraft = draft;
+
+    if (editingId) {
+      // Optimistic edit
+      setTasks((current) =>
+        current.map((item) =>
+          item.id === editingId
+            ? {
+                ...item,
+                title: payload.title,
+                description: payload.description ?? null,
+                priority: payload.priority ?? "medium",
+                due_date: payload.due_date ?? null,
+                tags: payload.tags ?? [],
+                category: payload.category ?? null,
+                updated_at: new Date().toISOString(),
+              }
+            : item
+        )
+      );
       setDraft(emptyDraft);
       setEditingId(null);
-      refresh();
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Could not save task.");
-    } finally {
-      setSaving(false);
+      try {
+        await updateTask(editingId, payload);
+        toast.success("Task updated.");
+      } catch (error) {
+        // Rollback
+        setTasks(prevTasks);
+        setEditingId(prevEditingId);
+        setDraft(prevDraft);
+        toast.error(error instanceof Error ? error.message : "Could not update task.");
+      } finally {
+        setSaving(false);
+      }
+    } else {
+      // Optimistic create
+      const optimisticId = Date.now() * -1; // negative IDs mark optimistic records
+      const ownerName = users.find((u) => u.id === currentUserId)?.name || "You";
+      const optimisticTask: Task = {
+        id: optimisticId,
+        user_id: currentUserId,
+        owner_name: ownerName,
+        title: payload.title,
+        description: payload.description ?? null,
+        priority: payload.priority ?? "medium",
+        status: "pending",
+        due_date: payload.due_date ?? null,
+        tags: payload.tags ?? [],
+        category: payload.category ?? null,
+        position: 0,
+        deleted_at: null,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        subtasks: [],
+        comments_count: 0,
+      };
+      setTasks((current) => [optimisticTask, ...current]);
+      setTotal((value) => value + 1);
+      setDraft(emptyDraft);
+      setEditingId(null);
+      try {
+        const result = await createTask(payload);
+        // Replace optimistic record with real one from the server
+        setTasks((current) =>
+          current.map((item) => (item.id === optimisticId ? result : item))
+        );
+        toast.success("Task created.");
+      } catch (error) {
+        // Rollback
+        setTasks(prevTasks);
+        setTotal((value) => Math.max(0, value - 1));
+        toast.error(error instanceof Error ? error.message : "Could not create task.");
+      } finally {
+        setSaving(false);
+      }
     }
   }
 
   async function removeTask(task: Task) {
+    // --- Optimistic delete ---
+    const prevTasks = tasks;
+    const prevTotal = total;
+    setTasks((current) => current.filter((item) => item.id !== task.id));
+    setTotal((value) => Math.max(0, value - 1));
     try {
       await deleteTask(task.id);
-      setTasks((current) => current.filter((item) => item.id !== task.id));
-      setTotal((value) => Math.max(0, value - 1));
       toast("Task moved to deleted items.", {
         action: {
           label: "Undo",
@@ -162,6 +229,9 @@ export function TaskWorkspace({ isAdmin, currentUserId, users }: TaskWorkspacePr
         duration: 5000,
       });
     } catch (error) {
+      // Rollback delete
+      setTasks(prevTasks);
+      setTotal(prevTotal);
       toast.error(error instanceof Error ? error.message : "Could not delete task.");
     }
   }
@@ -294,7 +364,25 @@ export function TaskWorkspace({ isAdmin, currentUserId, users }: TaskWorkspacePr
       <div className="task-list" aria-live="polite">
         {loading ? <div className="workspace-empty">Loading tasks…</div> : tasks.length === 0 ? <div className="workspace-empty">No tasks match these filters.</div> : tasks.map((task, index) => (
           <article className={`task-row ${task.status}`} key={task.id}>
-            <button type="button" className={`task-check ${task.status === "completed" ? "is-complete" : ""}`} aria-label={task.status === "completed" ? "Mark task incomplete" : "Mark task complete"} onClick={async () => { await toggleTaskStatus(task.id); refresh(); }}><Check size={15} /></button>
+            <button type="button" className={`task-check ${task.status === "completed" ? "is-complete" : ""}`} aria-label={task.status === "completed" ? "Mark task incomplete" : "Mark task complete"} onClick={async () => {
+      const desired = task.status !== "completed";
+      // --- Optimistic toggle ---
+      const prevTasks = tasks;
+      setTasks((current) =>
+        current.map((item) =>
+          item.id === task.id
+            ? { ...item, status: desired ? "completed" : "pending", updated_at: new Date().toISOString() }
+            : item
+        )
+      );
+      try {
+        await toggleTaskStatus(task.id, desired);
+      } catch (error) {
+        // Rollback
+        setTasks(prevTasks);
+        toast.error(error instanceof Error ? error.message : "Could not update task.");
+      }
+    }}><Check size={15} /></button>
             <div className="task-row-main">
               <div className="task-row-title"><strong>{task.title}</strong><span className={`priority-label ${task.priority}`}>{task.priority}</span>{isAdmin && <span className="owner-label">{task.owner_name ?? `User ${task.user_id}`}</span>}</div>
               {task.description && <p>{task.description}</p>}

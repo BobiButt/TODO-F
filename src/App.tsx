@@ -73,7 +73,7 @@ export default function App() {
 }
 
 function AppShell() {
-  const { currentUserId, currentRole, currentUser, users, switchUser } = useRole();
+  const { currentUserId, currentRole, currentUser, users } = useRole();
   const { user: authUser } = useAuth();
   const [view, setView] = useState<WorkspaceView>("tasks");
   const activeRole = currentUser?.role ?? currentRole;
@@ -89,21 +89,9 @@ function AppShell() {
       <nav className="topbar" aria-label="Workspace">
         <div className="brand-nav">
           <a className="brand" href="/" aria-label="TaskFlow home"><span className="brand-glyph">T</span>taskflow</a>
-          <span className="user-welcome">{effectiveUser?.name}</span>
         </div>
-        <div className="workspace-switcher">
-          <span>WORKSPACE IDENTITY</span>
-          <select
-            aria-label="Select user or administrator workspace"
-            value={currentUserId}
-            onChange={(event) => {
-              const selected = users.find((user) => user.id === Number(event.target.value));
-              if (selected) switchUser(selected);
-            }}
-          >
-            {users.map((user) => <option key={user.id} value={user.id}>{user.name} · {user.role}</option>)}
-          </select>
-        </div>
+        <span className="user-welcome">{effectiveUser?.name}</span>
+        <span className="user-welcome">{effectiveUser?.name}</span>
         <button className="topbar-signout" type="button" onClick={() => {
           localStorage.removeItem("taskflow_token");
           localStorage.removeItem("taskflow_user");
@@ -126,7 +114,7 @@ function AppShell() {
           <nav className="workspace-nav" aria-label="Main navigation">
             <button type="button" className={view === "tasks" ? "active" : ""} onClick={() => setView("tasks")}><ClipboardList size={16} />Tasks</button>
             <button type="button" className={view === "assistant" ? "active" : ""} onClick={() => setView("assistant")}><Bot size={16} />Assistant</button>
-            {isAdmin && <button type="button" className={view === "admin" ? "active" : ""} onClick={() => setView("admin")}><Shield size={16} />Admin</button>}
+            {currentUser?.role === "admin" && <button type="button" className={view === "admin" ? "active" : ""} onClick={() => setView("admin")}><Shield size={16} />Admin</button>}
           </nav>
           <div className="rail-bottom">TASKFLOW<br />ASSISTED WORKSPACE</div>
         </aside>
