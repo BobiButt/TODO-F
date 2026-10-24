@@ -13,16 +13,19 @@ interface GoogleSignInButtonProps {
   className?: string;
 }
 
+// Global flag: ensures Google initializes exactly once per page load, 
+// preventing React Strict Mode from breaking it.
+let isGoogleGlobalInitialized = false;
+
 export function GoogleSignInButton({ className }: GoogleSignInButtonProps = {}) {
   const { login } = useAuth();
   const navigate = useNavigate();
   const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID as string | undefined;
   const ref = useRef<HTMLDivElement>(null);
   const [ready, setReady] = useState(false);
-  // Per-instance ref so React Strict Mode (mount → unmount → remount) resets it.
-  const isInitialized = useRef(false);
 
   useEffect(() => {
+    // Poll for the Google script to load
     const timer = setInterval(() => {
       if (window.google?.accounts?.id) {
         setReady(true);
@@ -36,15 +39,16 @@ export function GoogleSignInButton({ className }: GoogleSignInButtonProps = {}) 
     if (!ready || !clientId || !ref.current) return;
     if (!window.google?.accounts?.id) return;
 
-    // Only initialize once per instance; re-render the button on every mount.
-    if (!isInitialized.current) {
-      isInitialized.current = true;
+    // Initialize ONCE globally
+    if (!isGoogleGlobalInitialized) {
+      isGoogleGlobalInitialized = true;
       window.google.accounts.id.initialize({
         clientId,
         callback: handleCredentialResponse,
       });
     }
 
+    // Render the button
     window.google.accounts.id.renderButton(ref.current, {
       theme: "outline",
       size: "large",
@@ -71,6 +75,7 @@ export function GoogleSignInButton({ className }: GoogleSignInButtonProps = {}) 
     }
   };
 
+  // Debugging log
   console.log("Google Client ID:", clientId);
 
   if (!clientId) {
