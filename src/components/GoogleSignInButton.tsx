@@ -17,7 +17,7 @@ export function GoogleSignInButton({ className }: GoogleSignInButtonProps = {}) 
   const navigate = useNavigate();
   
   // 🚨 HARDCODED FOR TESTING
-  const clientId = "292952689335-b7310ecg1r9emo0qh0559a4a0s5ecjlu.apps.googleusercontent.com";
+  const clientId = "292952689335-4gjv5bm86h714cctrr6crang9k5cpar0.apps.googleusercontent.com";
   
   const ref = useRef<HTMLDivElement>(null);
   const [ready, setReady] = useState(false);
