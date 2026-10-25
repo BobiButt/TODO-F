@@ -32,7 +32,24 @@ export function LoginPage() {
         navigate("/");
       }
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Login failed.");
+      const err = error instanceof Error ? error : new Error(String(error));
+      let message = err.message;
+
+      // Backend returns 403 with detail.code === "email_not_verified" when
+      // credentials are valid but the email is unverified. apiRequest throws a
+      // JSON string containing { code, message, resend_otp, email }.
+      try {
+        const parsed = JSON.parse(message);
+        if (parsed && parsed.code === "email_not_verified") {
+          setAuthToken(null);
+          navigate("/verify-otp", { state: { email: parsed.email } });
+          return;
+        }
+      } catch {
+        // Not JSON — fall through to normal error display.
+      }
+
+      toast.error(message);
     } finally {
       setLoading(false);
     }

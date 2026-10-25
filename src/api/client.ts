@@ -74,37 +74,70 @@ export async function apiRequest<T>(endpoint: string, options: RequestInit = {})
     return null as unknown as T;
   }
 
+  // Try to parse the error body once — FastAPI envelopes errors as { detail: ... }.
+  let errorData: any = null;
+  try {
+    errorData = await response.json();
+  } catch {
+    // Non-JSON body — errorData stays null.
+  }
+
+  // Handle HTTP 403 Forbidden — email not verified.
+  if (response.status === 403) {
+    const detail = errorData && errorData.detail ? errorData.detail : null;
+    // Protected-route 403: "Email not verified. Please verify your email to access the dashboard."
+    if (typeof detail === "string" && detail.includes("not verified")) {
+      setAuthToken(null);
+      window.dispatchEvent(new CustomEvent("auth:email-not-verified"));
+      throw new Error("EMAIL_NOT_VERIFIED");
+    }
+    // Login 403: { code: "email_not_verified", message, resend_otp, email }.
+    if (detail && detail.code === "email_not_verified") {
+      setAuthToken(null);
+      window.dispatchEvent(new CustomEvent("auth:email-not-verified", { detail: { email: detail.email } }));
+      throw new Error(
+        JSON.stringify({
+          code: "email_not_verified",
+          message: detail.message,
+          resend_otp: detail.resend_otp,
+          email: detail.email,
+        })
+      );
+    }
+    // Any other 403 — surface the detail string or fall through.
+    const msg = typeof detail === "string" ? detail : JSON.stringify(detail || {});
+    throw new Error(msg || `HTTP 403: ${response.statusText}`);
+  }
+
   // Handle 401 Unauthorized — token invalid or expired.
   if (response.status === 401) {
     // FIX: clear the stale token so the app drops back to unauthenticated
     // state and RoleContext stops re-fetching.
     setAuthToken(null);
-    throw new Error("Session expired. Please log in again.");
+    const detail = errorData && errorData.detail ? errorData.detail : null;
+    const msg = typeof detail === "string" ? detail : "Session expired. Please log in again.";
+    throw new Error(msg);
   }
 
   // Check if response indicates an error (status >= 400).
   if (!response.ok) {
+    const detail = errorData && errorData.detail ? errorData.detail : null;
     let errorMessage = `HTTP ${response.status}: ${response.statusText}`;
-    try {
-      // Attempt to extract detail string from FastAPI error response envelope.
-      const errorData = await response.json();
-      if (errorData && errorData.detail) {
-        if (typeof errorData.detail === "string") {
-          errorMessage = errorData.detail;
-        } else if (Array.isArray(errorData.detail)) {
-          // Join Pydantic validation error descriptions.
-          errorMessage = errorData.detail.map((err: any) => err.msg || JSON.stringify(err)).join(", ");
-        }
-      }
-    } catch {
-      // If response body is not JSON, retain default status text.
+    if (typeof detail === "string") {
+      errorMessage = detail;
+    } else if (Array.isArray(detail)) {
+      // Join Pydantic validation error descriptions.
+      errorMessage = detail.map((err: any) => err.msg || JSON.stringify(err)).join(", ");
     }
     // Throw error to be caught by React Query or caller.
     throw new Error(errorMessage);
   }
 
   // Parse and return JSON payload.
-  return response.json();
+  if (errorData !== null) {
+    return errorData as T;
+  }
+  return response.json() as T;
 }
 
 export async function apiDownload(endpoint: string): Promise<Blob> {

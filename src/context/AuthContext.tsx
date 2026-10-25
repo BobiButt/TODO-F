@@ -19,16 +19,19 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { useNavigate } from "react-router-dom";
 import { User } from "@/types";
 
 interface AuthContextValue {
   token: string | null;
   user: User | null;
   isAuthenticated: boolean;
+  isVerified: boolean;
   isLoading: boolean;
   login: (token: string, user: User) => void;
   logout: () => void;
   setToken: (token: string | null) => void;
+  navigateToVerify: (email?: string) => void;
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
@@ -37,8 +40,10 @@ const TOKEN_KEY = "taskflow_token";
 const USER_KEY = "taskflow_user";
 
 export function AuthProvider({ children }: { children: ReactNode }) {
+  const navigate = useNavigate();
   const [token, setTokenState] = useState<string | null>(null);
   const [user, setUserState] = useState<User | null>(null);
+  const [isVerified, setIsVerifiedState] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
   // Restore session from localStorage on mount.
@@ -48,8 +53,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     if (savedToken && savedUser) {
       try {
+        const parsedUser = JSON.parse(savedUser);
         setTokenState(savedToken);
-        setUserState(JSON.parse(savedUser));
+        setUserState(parsedUser);
+        setIsVerifiedState(!!parsedUser.is_verified);
       } catch {
         localStorage.removeItem(TOKEN_KEY);
         localStorage.removeItem(USER_KEY);
@@ -58,11 +65,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setIsLoading(false);
   }, []);
 
+  // Global handler: any API 403 "email not verified" redirects to OTP/login.
+  useEffect(() => {
+    const onEmailNotVerified = (event: CustomEvent) => {
+      const email = (event.detail as { email?: string })?.email;
+      navigate("/verify-otp", { state: { email } });
+    };
+    window.addEventListener("auth:email-not-verified", onEmailNotVerified as EventListener);
+    return () =>
+      window.removeEventListener("auth:email-not-verified", onEmailNotVerified as EventListener);
+  }, [navigate]);
+
   const login = (tokenValue: string, userValue: User) => {
     localStorage.setItem(TOKEN_KEY, tokenValue);
     localStorage.setItem(USER_KEY, JSON.stringify(userValue));
     setTokenState(tokenValue);
     setUserState(userValue);
+    setIsVerifiedState(!!userValue.is_verified);
   };
 
   const logout = () => {
@@ -70,6 +89,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.removeItem(USER_KEY);
     setTokenState(null);
     setUserState(null);
+    setIsVerifiedState(false);
   };
 
   const setToken = (tokenValue: string | null) => {
@@ -81,16 +101,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setTokenState(tokenValue);
   };
 
+  const navigateToVerify = (email?: string) => {
+    navigate("/verify-otp", { state: { email } });
+  };
+
   return (
     <AuthContext.Provider
       value={{
         token,
         user,
         isAuthenticated: !!token && !!user,
+        isVerified,
         isLoading,
         login,
         logout,
         setToken,
+        navigateToVerify,
       }}
     >
       {children}

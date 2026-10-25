@@ -18,9 +18,9 @@ import { User } from "@/types";
 type WorkspaceView = "tasks" | "assistant" | "admin";
 type Role = "admin" | "user";
 
-// Redirects to login if not authenticated.
+// Redirects to login if not authenticated or email not verified.
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, isLoading, isVerified } = useAuth();
   const location = useLocation();
 
   if (isLoading) {
@@ -38,6 +38,10 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 
   if (!isAuthenticated) {
     return <Navigate to="/login" state={{ from: location }} replace />;
+  }
+
+  if (!isVerified) {
+    return <Navigate to="/verify-otp" state={{ from: location }} replace />;
   }
 
   return <>{children}</>;

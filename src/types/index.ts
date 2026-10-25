@@ -25,6 +25,8 @@ export interface User {
   role: Role;
   created_at: string;
   updated_at: string;
+  is_verified?: boolean;
+  email_verified_at?: string | null;
 }
 
 /** Checklist subtask item. */
