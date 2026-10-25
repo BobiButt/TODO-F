@@ -215,7 +215,7 @@ export function RegisterPage() {
           </button>
         </form>
 
-        <GoogleSignInButton className="w-full" />
+        <GoogleSignInButton className="" />
 
         <p className="text-center text-sm text-gray-400">
           Already have an account?{" "}
