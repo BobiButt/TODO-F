@@ -24,6 +24,9 @@ export function GoogleSignInButton({ className }: GoogleSignInButtonProps = {}) 
   // Per-instance flag: resets on Strict Mode unmount/remount so initialize()
   // is called once per mount, bound to the correct DOM element.
   const isInitialized = useRef(false);
+  // True once initialize() has been called — renderButton() waits for this so
+  // Google has time to register the client ID before the button is mounted.
+  const [initialized, setInitialized] = useState(false);
 
   // Update the callback ref on every render
   useEffect(() => {
@@ -55,6 +58,8 @@ export function GoogleSignInButton({ className }: GoogleSignInButtonProps = {}) 
     return () => clearInterval(timer);
   }, []);
 
+  // 1. Call initialize() once the script is ready and we have a client ID.
+  //    Google registers the client ID asynchronously inside initialize().
   useEffect(() => {
     if (!ready || !ref.current) return;
     if (!window.google?.accounts?.id) return;
@@ -75,9 +80,16 @@ export function GoogleSignInButton({ className }: GoogleSignInButtonProps = {}) 
         clientId,
         callback: (res: any) => callbackRef.current(res),
       });
+      setInitialized(true);
     }
+  }, [ready, clientId]);
 
-    // Render the native GSI button only after initialize() has been called.
+  // 2. Render the native GSI button only after initialize() has been called.
+  //    Deferring this prevents Google from sending client_id=undefined.
+  useEffect(() => {
+    if (!initialized || !ref.current) return;
+    if (!window.google?.accounts?.id) return;
+
     window.google.accounts.id.renderButton(ref.current, {
       theme: "outline",
       size: "large",
@@ -85,7 +97,7 @@ export function GoogleSignInButton({ className }: GoogleSignInButtonProps = {}) 
       shape: "rectangular",
       logo_alignment: "left",
     });
-  }, [ready, clientId]);
+  }, [initialized]);
 
   // Fallback: custom HTML button that triggers Google One Tap prompt when clientId is missing
   const gsi = window.google?.accounts?.id;
