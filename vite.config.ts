@@ -73,10 +73,15 @@ export default defineConfig(({ mode }): UserConfig => {
       },
     },
 
-    // Inject API_BASE_URL at build time so client.ts can read it.
+    // Inject env variables at build time so client.ts and GoogleSignInButton
+    // can read them. Values come from the real build environment (process.env),
+    // falling back to the .env file, then to sensible defaults.
     define: {
       "import.meta.env.API_BASE_URL": JSON.stringify(apiBaseUrl),
       "import.meta.env.VITE_APP_ENV": JSON.stringify(mode),
+      "import.meta.env.VITE_GOOGLE_CLIENT_ID": JSON.stringify(
+        process.env.VITE_GOOGLE_CLIENT_ID || env.VITE_GOOGLE_CLIENT_ID || ""
+      ),
     },
 
     build: {

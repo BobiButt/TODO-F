@@ -41,6 +41,25 @@ Vercel → **Project** → **Settings** → **Environment Variables** → add:
 > JavaScript bundle. Changing it requires a new deployment (redeploy, not
 > just a restart).
 
+### 2. Configure Google Sign-In client ID
+
+Google Sign-In needs an OAuth client ID baked into the bundle as
+`VITE_GOOGLE_CLIENT_ID`. Get it from **Google Cloud Console → APIs &
+Services → Credentials → OAuth 2.0 Client IDs**.
+
+Add it in **Vercel → Project → Settings → Environment Variables**:
+
+| Variable | Scope | Value |
+| --- | --- | --- |
+| `VITE_GOOGLE_CLIENT_ID` | **Build and Runtime** | `292952689335-....apps.googleusercontent.com` |
+
+Also add your Vercel domain to the **Authorized JavaScript origins** and the
+production callback URL to **Authorized redirect URIs** in Google Cloud
+Console, otherwise Google will reject the token.
+
+Without this variable the GSI button sends `client_id=undefined` and Google
+returns `Error 400: invalid_request` (Missing required parameter: client_id).
+
 ### Option B — the `.env` file
 
 Edit `frontend-test/.env`:

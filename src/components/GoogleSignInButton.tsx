@@ -77,9 +77,7 @@ export function GoogleSignInButton({ className }: GoogleSignInButtonProps = {}) 
       });
     }
 
-    // Render the native GSI button
-    // width omitted so the button fills its container (responsive).
-    // The parent div already has w-full from the className passed in AuthPages.
+    // Render the native GSI button only after initialize() has been called.
     window.google.accounts.id.renderButton(ref.current, {
       theme: "outline",
       size: "large",
