@@ -9,21 +9,23 @@ interface GoogleSignInButtonProps {
   className?: string;
 }
 
-// Global flag to prevent React Strict Mode double-initialization
-let isGoogleInitialized = false;
-
 export function GoogleSignInButton({ className }: GoogleSignInButtonProps = {}) {
   const { login } = useAuth();
   const navigate = useNavigate();
-  
-  // 🚨 HARDCODED FOR TESTING
-  const clientId = "292952689335-4gjv5bm86h714cctrr6crang9k5cpar0.apps.googleusercontent.com";
-  
+  // Read from Vite env — must start with VITE_ to be exposed to the browser bundle
+  const rawClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+  const clientId = rawClientId ? rawClientId.trim() : undefined;
   const ref = useRef<HTMLDivElement>(null);
   const [ready, setReady] = useState(false);
 
+  // Use a ref for the callback to avoid stale closures in Google's script
   const callbackRef = useRef<(response: { credential: string }) => void>(() => {});
 
+  // Per-instance flag: resets on Strict Mode unmount/remount so initialize()
+  // is called once per mount, bound to the correct DOM element.
+  const isInitialized = useRef(false);
+
+  // Update the callback ref on every render
   useEffect(() => {
     callbackRef.current = async (response) => {
       try {
@@ -42,6 +44,7 @@ export function GoogleSignInButton({ className }: GoogleSignInButtonProps = {}) 
     };
   });
 
+  // Poll for the Google script to load
   useEffect(() => {
     const timer = setInterval(() => {
       if (window.google?.accounts?.id) {
@@ -53,28 +56,65 @@ export function GoogleSignInButton({ className }: GoogleSignInButtonProps = {}) 
   }, []);
 
   useEffect(() => {
-    if (!ready || !clientId || !ref.current) return;
+    if (!ready || !ref.current) return;
     if (!window.google?.accounts?.id) return;
 
-    if (!isGoogleInitialized) {
-      isGoogleInitialized = true;
-      console.log("🚨 INITIALIZING GOOGLE WITH CLIENT ID:", clientId);
-      
+    if (!clientId) {
+      // Cannot initialize GSI without a client ID — fall back to the custom prompt button
+      return;
+    }
+
+    // Log the exact clientId string before initializing (checks for hidden spaces / undefined)
+    console.log("Google Client ID:", JSON.stringify(clientId));
+
+    // Initialize once per mount (useRef resets on Strict Mode remount).
+    // Safe to call initialize() again on remount because the ref is fresh.
+    if (!isInitialized.current) {
+      isInitialized.current = true;
       window.google.accounts.id.initialize({
         clientId,
         callback: (res: any) => callbackRef.current(res),
       });
     }
 
+    // Render the native GSI button
+    // width omitted so the button fills its container (responsive).
+    // The parent div already has w-full from the className passed in AuthPages.
     window.google.accounts.id.renderButton(ref.current, {
       theme: "outline",
       size: "large",
-      width: "100%", // Kept your preference
       text: "signin_with",
       shape: "rectangular",
       logo_alignment: "left",
     });
   }, [ready, clientId]);
+
+  // Fallback: custom HTML button that triggers Google One Tap prompt when clientId is missing
+  const gsi = window.google?.accounts?.id;
+  if (!clientId && ready && gsi) {
+    return (
+      <button
+        type="button"
+        onClick={() => {
+          gsi.prompt();
+        }}
+        className={`w-full flex items-center justify-center gap-3 bg-white/5 border border-white/20 text-white font-medium py-2.5 rounded-lg hover:bg-white/10 transition-colors ${className ?? ""}`}
+      >
+        Sign in with Google
+      </button>
+    );
+  }
+
+  if (!clientId) {
+    return (
+      <button
+        disabled
+        className={`w-full flex items-center justify-center gap-3 bg-white/5 border border-white/20 text-white font-medium py-2.5 rounded-lg ${className ?? ""}`}
+      >
+        Google Sign-In not configured
+      </button>
+    );
+  }
 
   return <div ref={ref} className={className ?? ""} />;
 }

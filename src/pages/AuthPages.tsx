@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Mail, Lock, ArrowRight, AlertCircle } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { loginUser, registerUser, verifyOTP, resendOTP } from "@/api/auth";
 import { setAuthToken } from "@/api/client";
 import { useAuth } from "@/context/AuthContext";
@@ -239,11 +239,12 @@ export function OTPPage() {
   const [code, setCode] = useState("");
   const [loading, setLoading] = useState(false);
 
+  const location = useLocation();
+
   useEffect(() => {
-    const location = navigate as any;
-    const state = (location as any).state || {};
+    const state = (location.state as { email?: string }) || {};
     if (state.email) setEmail(state.email);
-  }, [navigate]);
+  }, [location.state]);
 
   const handleVerify = async (event: React.FormEvent) => {
     event.preventDefault();
