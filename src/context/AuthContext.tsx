@@ -8,6 +8,9 @@
 //             Provides login(), logout(), and setToken() mutations.
 // USED BY / DEPENDS ON: src/api/client.ts (reads token), src/pages/* (login UI),
 //             src/App.tsx (route protection).
+// NOTE: AuthProvider is rendered outside <BrowserRouter> in main.tsx, so it
+//       cannot use react-router's useNavigate(). Navigation is done via
+//       window.location.href instead.
 // KEY CONCEPTS: JWT Bearer token, localStorage persistence, session restore,
 //             protected route gating.
 // ============================================================================
@@ -19,7 +22,6 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { useNavigate } from "react-router-dom";
 import { User } from "@/types";
 
 interface AuthContextValue {
@@ -40,7 +42,6 @@ const TOKEN_KEY = "taskflow_token";
 const USER_KEY = "taskflow_user";
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const navigate = useNavigate();
   const [token, setTokenState] = useState<string | null>(null);
   const [user, setUserState] = useState<User | null>(null);
   const [isVerified, setIsVerifiedState] = useState(false);
@@ -66,15 +67,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   // Global handler: any API 403 "email not verified" redirects to OTP/login.
+  // Uses window.location.href so it works from outside <BrowserRouter>.
   useEffect(() => {
     const onEmailNotVerified = (event: CustomEvent) => {
       const email = (event.detail as { email?: string })?.email;
-      navigate("/verify-otp", { state: { email } });
+      const url = email ? `/verify-otp?email=${encodeURIComponent(email)}` : "/verify-otp";
+      window.location.href = url;
     };
     window.addEventListener("auth:email-not-verified", onEmailNotVerified as EventListener);
     return () =>
       window.removeEventListener("auth:email-not-verified", onEmailNotVerified as EventListener);
-  }, [navigate]);
+  }, []);
 
   const login = (tokenValue: string, userValue: User) => {
     localStorage.setItem(TOKEN_KEY, tokenValue);
@@ -102,7 +105,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const navigateToVerify = (email?: string) => {
-    navigate("/verify-otp", { state: { email } });
+    const url = email ? `/verify-otp?email=${encodeURIComponent(email)}` : "/verify-otp";
+    window.location.href = url;
   };
 
   return (

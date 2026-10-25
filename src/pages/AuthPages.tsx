@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Mail, Lock, ArrowRight, AlertCircle } from "lucide-react";
-import { useNavigate, useLocation } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { loginUser, registerUser, verifyOTP, resendOTP } from "@/api/auth";
 import { setAuthToken } from "@/api/client";
 import { useAuth } from "@/context/AuthContext";
@@ -42,7 +42,7 @@ export function LoginPage() {
         const parsed = JSON.parse(message);
         if (parsed && parsed.code === "email_not_verified") {
           setAuthToken(null);
-          navigate("/verify-otp", { state: { email: parsed.email } });
+          navigate(`/verify-otp?email=${encodeURIComponent(parsed.email)}`);
           return;
         }
       } catch {
@@ -256,12 +256,13 @@ export function OTPPage() {
   const [code, setCode] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const location = useLocation();
-
+  // Email arrives as a URL query param (from AuthProvider's
+  // window.location.href redirect) or via React Router state.
   useEffect(() => {
-    const state = (location.state as { email?: string }) || {};
-    if (state.email) setEmail(state.email);
-  }, [location.state]);
+    const params = new URLSearchParams(window.location.search);
+    const q = params.get("email");
+    if (q) setEmail(q);
+  }, []);
 
   const handleVerify = async (event: React.FormEvent) => {
     event.preventDefault();
