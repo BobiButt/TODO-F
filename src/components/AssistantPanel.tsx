@@ -1,6 +1,7 @@
 import { FormEvent, useEffect, useRef, useState } from "react";
 import { Bot, LoaderCircle, Send, ShieldCheck, Sparkles, UserRound } from "lucide-react";
 import { AssistantDiagnostic, AssistantMessage, sendAssistantMessage } from "@/api/assistant";
+import { useTaskCache } from "@/context/TaskContext";
 import { Role } from "@/types";
 
 interface AssistantPanelProps {
@@ -33,6 +34,8 @@ export function AssistantPanel({ role, name }: AssistantPanelProps) {
   const [error, setError] = useState("");
   const bottomRef = useRef<HTMLDivElement>(null);
 
+  const { notifyAssistantAction } = useTaskCache();
+
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
   }, [messages, sending]);
@@ -52,6 +55,8 @@ export function AssistantPanel({ role, name }: AssistantPanelProps) {
         ...current,
         { role: "assistant", content: response.reply, diagnostics: response.diagnostics },
       ]);
+      // Notify task cache to quietly update tasks in the background if the assistant executed actions
+      notifyAssistantAction(response.actions);
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : "The assistant could not respond.");
     } finally {

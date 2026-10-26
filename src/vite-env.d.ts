@@ -30,15 +30,30 @@ interface ImportMeta {
 }
 
 declare interface Window {
+  __GOOGLE_CLIENT_ID__?: string;
   google?: {
     accounts: {
       id: {
-        initialize: (config: Record<string, unknown>) => void;
+        initialize: (config: {
+          client_id?: string;
+          clientId?: string;
+          callback?: (response: { credential: string }) => void;
+          auto_select?: boolean;
+          cancel_on_tap_outside?: boolean;
+          itp_support?: boolean;
+          use_fedcm_for_prompt?: boolean;
+          [key: string]: unknown;
+        }) => void;
         renderButton: (
           element: HTMLElement,
           options: Record<string, unknown>,
         ) => void;
-        prompt: () => void;
+        prompt: (notification?: (notification: unknown) => void) => void;
+        disableAutoSelect?: () => void;
+      };
+      oauth2?: {
+        initTokenClient: (config: Record<string, unknown>) => unknown;
+        initCodeClient: (config: Record<string, unknown>) => unknown;
       };
     };
   };

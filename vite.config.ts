@@ -97,26 +97,7 @@ export default defineConfig(({ mode }): UserConfig => {
       // Split the vendor code out of the app chunk so it can be cached
       // forever (the file name contains a content hash).
       chunkSizeWarningLimit: 900,
-      rollupOptions: {
-        output: {
-          manualChunks: {
-            vendor: [
-              "react",
-              "react-dom",
-              "react-router-dom",
-              "sonner",
-              "framer-motion",
-            ],
-            ui: [
-              "lucide-react",
-              "@tanstack/react-query",
-              "@dnd-kit/core",
-              "@dnd-kit/sortable",
-              "@dnd-kit/utilities",
-            ],
-          },
-        },
-      },
+      rollupOptions: {},
     },
   };
 });

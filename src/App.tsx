@@ -95,7 +95,6 @@ function AppShell() {
           <a className="brand" href="/" aria-label="TaskFlow home"><span className="brand-glyph">T</span>taskflow</a>
         </div>
         <span className="user-welcome">{effectiveUser?.name}</span>
-        <span className="user-welcome">{effectiveUser?.name}</span>
         <button className="topbar-signout" type="button" onClick={() => {
           localStorage.removeItem("taskflow_token");
           localStorage.removeItem("taskflow_user");

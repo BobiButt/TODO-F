@@ -232,7 +232,13 @@ export function RegisterPage() {
           </button>
         </form>
 
-        <GoogleSignInButton className="" />
+        <div className="relative flex items-center gap-4">
+          <div className="flex-1 h-px bg-white/20" />
+          <span className="text-xs text-gray-400 uppercase tracking-wider">Or continue with</span>
+          <div className="flex-1 h-px bg-white/20" />
+        </div>
+
+        <GoogleSignInButton className="w-full" />
 
         <p className="text-center text-sm text-gray-400">
           Already have an account?{" "}
