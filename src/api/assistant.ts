@@ -28,12 +28,17 @@ export interface AssistantResponse {
   diagnostics?: AssistantDiagnostic[];
 }
 
-/** Max time (ms) to wait for the assistant before aborting. Vercel functions die at 10s. */
-const ASSISTANT_TIMEOUT_MS = 9000;
+/** Max time (ms) to wait for the assistant before aborting.
+ * Backend may try multiple providers + tool loops; allow enough time to avoid
+ * premature "signal is aborted without reason" failures. */
+const ASSISTANT_TIMEOUT_MS = 45000;
 
 export function sendAssistantMessage(messages: AssistantMessage[]): Promise<AssistantResponse> {
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), ASSISTANT_TIMEOUT_MS);
+  const timeoutId = setTimeout(
+    () => controller.abort(new DOMException("Assistant request timed out.", "AbortError")),
+    ASSISTANT_TIMEOUT_MS,
+  );
 
   const promise = apiRequest<AssistantResponse>("/assistant/chat", {
     method: "POST",
@@ -46,7 +51,7 @@ export function sendAssistantMessage(messages: AssistantMessage[]): Promise<Assi
 
   settled.catch((error) => {
     if (error instanceof Error && error.name === "AbortError") {
-      toast.error("AI is taking too long to respond. Please try a shorter prompt.");
+      toast.error("AI is taking too long to respond. Please try again in a moment.");
     }
   });
 
