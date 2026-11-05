@@ -1,5 +1,4 @@
 import { apiRequest } from "@/api/client";
-import { toast } from "sonner";
 
 export interface AssistantMessage {
   role: "user" | "assistant";
@@ -28,6 +27,12 @@ export interface AssistantResponse {
   diagnostics?: AssistantDiagnostic[];
 }
 
+export interface AssistantHistoryMessage extends AssistantMessage {
+  id?: number;
+  created_at?: string;
+  meta?: Record<string, unknown>;
+}
+
 /** Max time (ms) to wait for the assistant before aborting.
  * Backend may try multiple providers + tool loops; allow enough time to avoid
  * premature "signal is aborted without reason" failures. */
@@ -51,9 +56,18 @@ export function sendAssistantMessage(messages: AssistantMessage[]): Promise<Assi
 
   settled.catch((error) => {
     if (error instanceof Error && error.name === "AbortError") {
-      toast.error("AI is taking too long to respond. Please try again in a moment.");
+      // handled by caller UI where appropriate
     }
   });
 
   return settled;
+}
+
+export async function fetchAssistantHistory(limit = 100): Promise<AssistantHistoryMessage[]> {
+  const res = await apiRequest<{ messages: AssistantHistoryMessage[] }>(`/assistant/history?limit=${limit}`);
+  return res.messages ?? [];
+}
+
+export async function clearAssistantHistory(): Promise<void> {
+  await apiRequest<{ cleared: boolean }>("/assistant/history", { method: "DELETE" });
 }

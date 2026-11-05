@@ -22,6 +22,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { setAuthToken } from "@/api/client";
 import { User } from "@/types";
 
 interface AuthContextValue {
@@ -55,13 +56,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (savedToken && savedUser) {
       try {
         const parsedUser = JSON.parse(savedUser);
+        setAuthToken(savedToken);
         setTokenState(savedToken);
         setUserState(parsedUser);
         setIsVerifiedState(!!parsedUser.is_verified);
       } catch {
+        setAuthToken(null);
         localStorage.removeItem(TOKEN_KEY);
         localStorage.removeItem(USER_KEY);
       }
+    } else {
+      setAuthToken(null);
     }
     setIsLoading(false);
   }, []);
@@ -82,6 +87,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const login = (tokenValue: string, userValue: User) => {
     localStorage.setItem(TOKEN_KEY, tokenValue);
     localStorage.setItem(USER_KEY, JSON.stringify(userValue));
+    setAuthToken(tokenValue);
     setTokenState(tokenValue);
     setUserState(userValue);
     setIsVerifiedState(!!userValue.is_verified);
@@ -90,6 +96,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logout = () => {
     localStorage.removeItem(TOKEN_KEY);
     localStorage.removeItem(USER_KEY);
+    setAuthToken(null);
     setTokenState(null);
     setUserState(null);
     setIsVerifiedState(false);
@@ -101,6 +108,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } else {
       localStorage.removeItem(TOKEN_KEY);
     }
+    setAuthToken(tokenValue);
     setTokenState(tokenValue);
   };
 

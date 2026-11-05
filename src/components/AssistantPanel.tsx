@@ -1,7 +1,13 @@
 import { FormEvent, useEffect, useRef, useState } from "react";
-import { Bot, ImageIcon, LoaderCircle, Send, ShieldCheck, Sparkles, UserRound, X } from "lucide-react";
-import { AssistantDiagnostic, AssistantMessage, sendAssistantMessage } from "@/api/assistant";
-import { generateImage } from "@/api/image";
+import { Bot, Download, ImageIcon, LoaderCircle, Send, ShieldCheck, Sparkles, Trash2, UserRound, X } from "lucide-react";
+import {
+  AssistantDiagnostic,
+  AssistantMessage,
+  clearAssistantHistory,
+  fetchAssistantHistory,
+  sendAssistantMessage,
+} from "@/api/assistant";
+import { downloadImage, generateImage } from "@/api/image";
 import { useTaskCache } from "@/context/TaskContext";
 import { Role } from "@/types";
 
@@ -14,6 +20,8 @@ interface AssistantPanelProps {
 interface DisplayMessage extends AssistantMessage {
   diagnostics?: AssistantDiagnostic[];
   imageUrl?: string;
+  imageBlob?: Blob;
+  imagePrompt?: string;
 }
 
 const suggestions: Record<Role, string[]> = {
@@ -21,16 +29,46 @@ const suggestions: Record<Role, string[]> = {
   admin: ["Give me a system summary", "Show all overdue tasks", "List the users"],
 };
 
+const CHAT_CACHE_KEY = "taskflow_chat_cache_v1";
+const MAX_CACHE_MESSAGES = 120;
+
+function loadChatCache(): DisplayMessage[] | null {
+  try {
+    const raw = localStorage.getItem(CHAT_CACHE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return null;
+    return parsed
+      .filter((m) => m && (m.role === "user" || m.role === "assistant") && typeof m.content === "string")
+      .map((m) => ({ role: m.role, content: m.content, diagnostics: m.diagnostics }));
+  } catch {
+    return null;
+  }
+}
+
+function saveChatCache(messages: DisplayMessage[]) {
+  try {
+    const safe = messages.slice(-MAX_CACHE_MESSAGES).map((m) => ({
+      role: m.role,
+      content: m.content,
+      diagnostics: m.diagnostics,
+      // image blobs/URLs are not persisted in localStorage; DB stores task/chat text only
+    }));
+    localStorage.setItem(CHAT_CACHE_KEY, JSON.stringify(safe));
+  } catch {
+    // ignore quota/storage errors
+  }
+}
+
 export function AssistantPanel({ role, name }: AssistantPanelProps) {
   const isAdmin = role === "admin";
-  const [messages, setMessages] = useState<DisplayMessage[]>([
-    {
-      role: "assistant",
-      content: isAdmin
-        ? `Hi ${name}. I can help review and manage TaskFlow across users, tasks, and system activity.`
-        : `Hi ${name}. I can help organize and update your tasks. I only have access to your own workspace.`,
-    },
-  ]);
+  const defaultMessage: DisplayMessage = {
+    role: "assistant",
+    content: isAdmin
+      ? `Hi ${name}. I can help review and manage TaskFlow across users, tasks, and system activity.`
+      : `Hi ${name}. I can help organize and update your tasks. I only have access to your own workspace.`,
+  };
+  const [messages, setMessages] = useState<DisplayMessage[]>(() => loadChatCache() ?? [defaultMessage]);
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
   const [error, setError] = useState("");
@@ -48,6 +86,27 @@ export function AssistantPanel({ role, name }: AssistantPanelProps) {
   }, [messages, sending, imageMode, generatingImage]);
 
   useEffect(() => {
+    saveChatCache(messages);
+  }, [messages]);
+
+  // Load persisted chat from DB (text conversation). Merges/replaces cache when available.
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const history = await fetchAssistantHistory(120);
+        if (!mounted || !history.length) return;
+        setMessages(history.map((m) => ({ role: m.role, content: m.content })));
+      } catch {
+        // keep local cache/default if backend history unavailable
+      }
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
     return () => {
       objectUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
       objectUrlsRef.current.clear();
@@ -63,11 +122,11 @@ export function AssistantPanel({ role, name }: AssistantPanelProps) {
     setImagePrompt("");
     setGeneratingImage(true);
     try {
-      const url = await generateImage(content);
+      const { url, blob } = await generateImage(content);
       objectUrlsRef.current.add(url);
       setMessages((current) => [
         ...current,
-        { role: "assistant", content: `Generated image for: "${content}"`, imageUrl: url },
+        { role: "assistant", content: `Generated image for: "${content}"`, imageUrl: url, imageBlob: blob, imagePrompt: content },
       ]);
       setImageMode(false);
     } catch (requestError) {
@@ -101,6 +160,16 @@ export function AssistantPanel({ role, name }: AssistantPanelProps) {
     }
   }
 
+  async function clearChat() {
+    setMessages([defaultMessage]);
+    setError("");
+    try {
+      await clearAssistantHistory();
+    } catch {
+      // local cleared; server clear best-effort
+    }
+  }
+
   return (
     <section className="assistant-panel" aria-label={`${role} assistant chat`}>
       <header className={`assistant-header ${isAdmin ? "assistant-admin" : "assistant-user"}`}>
@@ -113,6 +182,9 @@ export function AssistantPanel({ role, name }: AssistantPanelProps) {
           {isAdmin ? <ShieldCheck size={14} /> : <UserRound size={14} />}
           {isAdmin ? "System scope" : "Your tasks only"}
         </span>
+        <button type="button" className="assistant-icon-btn" aria-label="Clear chat history" title="Clear chat" onClick={() => void clearChat()} disabled={sending || generatingImage}>
+          <Trash2 size={15} />
+        </button>
       </header>
 
       <div className="assistant-conversation" aria-live="polite">
@@ -126,12 +198,25 @@ export function AssistantPanel({ role, name }: AssistantPanelProps) {
               <span className="message-author">{message.role === "assistant" ? (isAdmin ? "ADMIN ASSISTANT" : "TASK ASSISTANT") : name.toUpperCase()}</span>
               <p>{message.content}</p>
               {message.imageUrl && (
-                <img
-                  src={message.imageUrl}
-                  alt="Generated from prompt"
-                  className="assistant-generated-image"
-                  loading="lazy"
-                />
+                <>
+                  <img
+                    src={message.imageUrl}
+                    alt="Generated from prompt"
+                    className="assistant-generated-image"
+                    loading="lazy"
+                  />
+                  {message.imageBlob && (
+                    <div className="assistant-image-actions">
+                      <button
+                        type="button"
+                        className="plain-button"
+                        onClick={() => downloadImage(message.imageBlob!, `taskflow-${(message.imagePrompt || "image").slice(0, 24).replace(/[^a-z0-9]+/gi, "-")}.png`)}
+                      >
+                        <Download size={14} /> Download image
+                      </button>
+                    </div>
+                  )}
+                </>
               )}
               {message.diagnostics && message.diagnostics.length > 0 && (
                 <details className="assistant-diagnostics">
@@ -239,7 +324,7 @@ export function AssistantPanel({ role, name }: AssistantPanelProps) {
         <div className="assistant-footer">
           {imageMode
             ? "Image prompts are sent to Pollinations (free service). Generation may take up to a minute."
-            : "Messages go to the configured AI provider. Actions stay within TaskFlow and your current role."}
+            : "Text chat is saved to your account and cached locally for fast retrieval. Images can be downloaded but are not stored in DB."}
         </div>
       </div>
     </section>

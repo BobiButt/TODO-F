@@ -11,7 +11,7 @@ function getBaseUrl(): string {
   );
 }
 
-export async function generateImage(prompt: string): Promise<string> {
+export async function generateImage(prompt: string): Promise<{ url: string; blob: Blob }> {
   const trimmed = prompt.trim();
   if (!trimmed) {
     throw new Error("Please enter an image prompt.");
@@ -44,7 +44,7 @@ export async function generateImage(prompt: string): Promise<string> {
     if (!blob.type.startsWith("image/")) {
       throw new Error("The server did not return an image.");
     }
-    return URL.createObjectURL(blob);
+    return { url: URL.createObjectURL(blob), blob };
   } catch (error) {
     if (error instanceof Error && error.name === "AbortError") {
       toast.error("Image generation timed out. Please try again.");
@@ -54,4 +54,15 @@ export async function generateImage(prompt: string): Promise<string> {
   } finally {
     clearTimeout(timeoutId);
   }
+}
+
+export function downloadImage(blob: Blob, filename = `taskflow-image-${Date.now()}.png`) {
+  const href = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = href;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(href), 1000);
 }

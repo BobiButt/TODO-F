@@ -29,6 +29,22 @@ const BASE_URL =
 // Module-level holder for the current JWT token (set by AuthContext on login).
 let currentToken: string | null = null;
 
+const TOKEN_KEY = "taskflow_token";
+
+function getAuthToken(): string | null {
+  if (currentToken) return currentToken;
+  try {
+    const stored = localStorage.getItem(TOKEN_KEY);
+    if (stored) {
+      currentToken = stored;
+      return stored;
+    }
+  } catch {
+    // localStorage may be unavailable in restricted contexts.
+  }
+  return null;
+}
+
 /**
  * Call this once from AuthContext to inject the current JWT token.
  */
@@ -59,15 +75,26 @@ export async function apiRequest<T>(endpoint: string, options: RequestInit = {})
   }
 
   // Inject JWT Bearer token on every outgoing request.
-  if (currentToken) {
-    headers.set("Authorization", `Bearer ${currentToken}`);
+  const token = getAuthToken();
+  if (token) {
+    headers.set("Authorization", `Bearer ${token}`);
   }
 
   // Dispatch network request.
-  const response = await fetch(url, {
-    ...options,
-    headers,
-  });
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      ...options,
+      headers,
+    });
+  } catch (error) {
+    if (error instanceof Error && error.name === "AbortError") {
+      throw error;
+    }
+    const msg = error instanceof Error ? error.message : String(error);
+    // Common when API base URL/CORS is wrong or backend is down (e.g., Vercel env mismatch).
+    throw new Error(`Failed to reach API (${url}). ${msg}. Check VITE_API_BASE_URL/API_BASE_URL and backend CORS.`);
+  }
 
   // Handle HTTP 204 No Content response.
   if (response.status === 204) {
@@ -114,6 +141,11 @@ export async function apiRequest<T>(endpoint: string, options: RequestInit = {})
     // FIX: clear the stale token so the app drops back to unauthenticated
     // state and RoleContext stops re-fetching.
     setAuthToken(null);
+    try {
+      localStorage.removeItem(TOKEN_KEY);
+    } catch {
+      // ignore
+    }
     const detail = errorData && errorData.detail ? errorData.detail : null;
     const msg = typeof detail === "string" ? detail : "Session expired. Please log in again.";
     throw new Error(msg);
@@ -142,8 +174,9 @@ export async function apiRequest<T>(endpoint: string, options: RequestInit = {})
 
 export async function apiDownload(endpoint: string): Promise<Blob> {
   const cleanEndpoint = endpoint.startsWith("/") ? endpoint : `/${endpoint}`;
+  const token = getAuthToken();
   const response = await fetch(`${BASE_URL}${cleanEndpoint}`, {
-    headers: currentToken ? { Authorization: `Bearer ${currentToken}` } : {},
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
   });
   if (!response.ok) {
     let message = `HTTP ${response.status}: ${response.statusText}`;

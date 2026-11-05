@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Bot, ClipboardList, Shield } from "lucide-react";
+import { Bot, ClipboardList, ScrollText, Shield } from "lucide-react";
 import {
   BrowserRouter,
   Routes,
@@ -9,13 +9,14 @@ import {
 } from "react-router-dom";
 import { AdminWorkspace } from "@/components/AdminWorkspace";
 import { AssistantPanel } from "@/components/AssistantPanel";
+import { LogsPanel } from "@/components/LogsPanel";
 import { TaskWorkspace } from "@/components/TaskWorkspace";
 import { LoginPage, RegisterPage, OTPPage } from "@/pages/AuthPages";
 import { useRole } from "@/context/RoleContext";
 import { useAuth } from "@/context/AuthContext";
 import { User } from "@/types";
 
-type WorkspaceView = "tasks" | "assistant" | "admin";
+type WorkspaceView = "tasks" | "assistant" | "logs" | "admin";
 type Role = "admin" | "user";
 
 // Redirects to login if not authenticated or email not verified.
@@ -67,6 +68,7 @@ export default function App() {
           <Route index element={<Navigate to="/tasks" replace />} />
           <Route path="tasks" element={<AppView view="tasks" />} />
           <Route path="assistant" element={<AppView view="assistant" />} />
+          <Route path="logs" element={<AppView view="logs" />} />
           <Route path="admin" element={<AppView view="admin" />} />
         </Route>
 
@@ -117,6 +119,7 @@ function AppShell() {
           <nav className="workspace-nav" aria-label="Main navigation">
             <button type="button" className={view === "tasks" ? "active" : ""} onClick={() => setView("tasks")}><ClipboardList size={16} />Tasks</button>
             <button type="button" className={view === "assistant" ? "active" : ""} onClick={() => setView("assistant")}><Bot size={16} />Assistant</button>
+            <button type="button" className={view === "logs" ? "active" : ""} onClick={() => setView("logs")}><ScrollText size={16} />Logs</button>
             {currentUser?.role === "admin" && <button type="button" className={view === "admin" ? "active" : ""} onClick={() => setView("admin")}><Shield size={16} />Admin</button>}
           </nav>
           <div className="rail-bottom">TASKFLOW<br />ASSISTED WORKSPACE</div>
@@ -155,6 +158,7 @@ function AppView({
     <>
       {view === "tasks" && <TaskWorkspace isAdmin={isAdmin} currentUserId={currentUserId} users={users} />}
       {view === "assistant" && <AssistantPanel role={activeRole} name={effectiveUser?.name ?? "there"} />}
+      {view === "logs" && <LogsPanel isAdmin={isAdmin} />}
       {view === "admin" && isAdmin && <AdminWorkspace currentUserId={currentUserId} users={users} onUsersChanged={() => Promise.resolve()} />}
     </>
   );
