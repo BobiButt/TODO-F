@@ -1,6 +1,7 @@
 import { FormEvent, useEffect, useRef, useState } from "react";
-import { Bot, LoaderCircle, Send, ShieldCheck, Sparkles, UserRound } from "lucide-react";
+import { Bot, ImageIcon, LoaderCircle, Send, ShieldCheck, Sparkles, UserRound, X } from "lucide-react";
 import { AssistantDiagnostic, AssistantMessage, sendAssistantMessage } from "@/api/assistant";
+import { generateImage } from "@/api/image";
 import { useTaskCache } from "@/context/TaskContext";
 import { Role } from "@/types";
 
@@ -9,9 +10,10 @@ interface AssistantPanelProps {
   name: string;
 }
 
-/** Chat message enriched with optional provider diagnostics for display. */
+/** Chat message enriched with optional provider diagnostics and generated images. */
 interface DisplayMessage extends AssistantMessage {
   diagnostics?: AssistantDiagnostic[];
+  imageUrl?: string;
 }
 
 const suggestions: Record<Role, string[]> = {
@@ -36,9 +38,44 @@ export function AssistantPanel({ role, name }: AssistantPanelProps) {
 
   const { notifyAssistantAction } = useTaskCache();
 
+  const [imageMode, setImageMode] = useState(false);
+  const [imagePrompt, setImagePrompt] = useState("");
+  const [generatingImage, setGeneratingImage] = useState(false);
+  const objectUrlsRef = useRef<Set<string>>(new Set());
+
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
-  }, [messages, sending]);
+  }, [messages, sending, imageMode, generatingImage]);
+
+  useEffect(() => {
+    return () => {
+      objectUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
+      objectUrlsRef.current.clear();
+    };
+  }, []);
+
+  async function submitImagePrompt(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const content = imagePrompt.trim();
+    if (!content || generatingImage) return;
+    setError("");
+    setMessages((current) => [...current, { role: "user", content: `🖼️ Generate image: ${content}` }]);
+    setImagePrompt("");
+    setGeneratingImage(true);
+    try {
+      const url = await generateImage(content);
+      objectUrlsRef.current.add(url);
+      setMessages((current) => [
+        ...current,
+        { role: "assistant", content: `Generated image for: "${content}"`, imageUrl: url },
+      ]);
+      setImageMode(false);
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : "Image generation failed.");
+    } finally {
+      setGeneratingImage(false);
+    }
+  }
 
   async function submitMessage(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -88,6 +125,14 @@ export function AssistantPanel({ role, name }: AssistantPanelProps) {
             <div className="message-content">
               <span className="message-author">{message.role === "assistant" ? (isAdmin ? "ADMIN ASSISTANT" : "TASK ASSISTANT") : name.toUpperCase()}</span>
               <p>{message.content}</p>
+              {message.imageUrl && (
+                <img
+                  src={message.imageUrl}
+                  alt="Generated from prompt"
+                  className="assistant-generated-image"
+                  loading="lazy"
+                />
+              )}
               {message.diagnostics && message.diagnostics.length > 0 && (
                 <details className="assistant-diagnostics">
                   <summary>
@@ -113,11 +158,12 @@ export function AssistantPanel({ role, name }: AssistantPanelProps) {
           </article>
         ))}
         {sending && <div className="assistant-thinking"><LoaderCircle size={15} className="spin" /> Checking your workspace…</div>}
+        {generatingImage && <div className="assistant-thinking"><LoaderCircle size={15} className="spin" /> Generating image…</div>}
         <div ref={bottomRef} />
       </div>
 
       <div className="assistant-compose-area">
-        {messages.length < 3 && (
+        {messages.length < 3 && !imageMode && (
           <div className="assistant-suggestions" aria-label="Suggested requests">
             {suggestions[role].map((suggestion) => (
               <button type="button" key={suggestion} onClick={() => setDraft(suggestion)}>{suggestion}</button>
@@ -125,28 +171,76 @@ export function AssistantPanel({ role, name }: AssistantPanelProps) {
           </div>
         )}
         {error && <p className="assistant-error" role="alert">{error}</p>}
-        <form className="assistant-form" onSubmit={submitMessage}>
-          <label className="sr-only" htmlFor="assistant-message">Message the assistant</label>
-          <textarea
-            id="assistant-message"
-            value={draft}
-            onChange={(event) => setDraft(event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key === "Enter" && !event.shiftKey) {
-                event.preventDefault();
-                event.currentTarget.form?.requestSubmit();
-              }
-            }}
-            placeholder={isAdmin ? "Ask about users, tasks, or system status…" : "Ask about your tasks…"}
-            maxLength={4000}
-            rows={2}
-            disabled={sending}
-          />
-          <button className="assistant-send" type="submit" aria-label="Send message" disabled={!draft.trim() || sending}>
-            <Send size={17} />
-          </button>
-        </form>
-        <div className="assistant-footer">Messages go to the configured AI provider. Actions stay within TaskFlow and your current role.</div>
+        {imageMode ? (
+          <form className="assistant-form assistant-image-form" onSubmit={submitImagePrompt}>
+            <label className="sr-only" htmlFor="assistant-image-prompt">Image prompt</label>
+            <textarea
+              id="assistant-image-prompt"
+              value={imagePrompt}
+              onChange={(event) => setImagePrompt(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" && !event.shiftKey) {
+                  event.preventDefault();
+                  event.currentTarget.form?.requestSubmit();
+                }
+              }}
+              placeholder="Describe the image to generate…"
+              maxLength={1000}
+              rows={2}
+              disabled={generatingImage}
+            />
+            <button
+              type="button"
+              className="assistant-icon-btn"
+              aria-label="Cancel image mode"
+              onClick={() => { setImageMode(false); setImagePrompt(""); }}
+              disabled={generatingImage}
+              title="Back to chat"
+            >
+              <X size={17} />
+            </button>
+            <button className="assistant-send" type="submit" aria-label="Generate image" disabled={!imagePrompt.trim() || generatingImage}>
+              <Send size={17} />
+            </button>
+          </form>
+        ) : (
+          <form className="assistant-form" onSubmit={submitMessage}>
+            <button
+              type="button"
+              className="assistant-icon-btn"
+              aria-label="Generate image from prompt"
+              onClick={() => { setImageMode(true); setError(""); }}
+              disabled={sending}
+              title="Generate image"
+            >
+              <ImageIcon size={17} />
+            </button>
+            <label className="sr-only" htmlFor="assistant-message">Message the assistant</label>
+            <textarea
+              id="assistant-message"
+              value={draft}
+              onChange={(event) => setDraft(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" && !event.shiftKey) {
+                  event.preventDefault();
+                  event.currentTarget.form?.requestSubmit();
+                }
+              }}
+              placeholder={isAdmin ? "Ask about users, tasks, or system status…" : "Ask about your tasks…"}
+              maxLength={4000}
+              rows={2}
+              disabled={sending}
+            />
+            <button className="assistant-send" type="submit" aria-label="Send message" disabled={!draft.trim() || sending}>
+              <Send size={17} />
+            </button>
+          </form>
+        )}
+        <div className="assistant-footer">
+          {imageMode
+            ? "Image prompts are sent to Pollinations (free service). Generation may take up to a minute."
+            : "Messages go to the configured AI provider. Actions stay within TaskFlow and your current role."}
+        </div>
       </div>
     </section>
   );

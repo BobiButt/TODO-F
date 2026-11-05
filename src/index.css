@@ -90,8 +90,11 @@
 .assistant-form textarea { flex: 1; min-width: 0; resize: vertical; max-height: 140px; border: 0; outline: 0; color: var(--ink); background: transparent; font: 12px/1.6 'Inter', sans-serif; }
 .assistant-form textarea::placeholder { color: #778780; }
 .assistant-send { width: 35px; height: 35px; flex: 0 0 35px; display: grid; place-items: center; border: 0; color: #112019; background: var(--mint); cursor: pointer; }
+.assistant-icon-btn { width: 35px; height: 35px; flex: 0 0 35px; display: grid; place-items: center; border: 1px solid rgba(190, 215, 204, 0.21); cursor: pointer; color: var(--muted); background: transparent; }
+.assistant-icon-btn:hover:not(:disabled) { color: var(--ink); border-color: rgba(180, 227, 205, 0.4); }
+.assistant-generated-image { display: block; width: 100%; max-width: 420px; height: auto; margin-top: 10px; border: 1px solid rgba(190, 215, 204, 0.18); border-radius: 4px; background: rgba(5, 12, 10, 0.4); }
 .assistant-admin ~ .assistant-compose-area .assistant-send { background: var(--coral); }
-.assistant-send:disabled { cursor: not-allowed; opacity: 0.38; }
+.assistant-send:disabled, .assistant-icon-btn:disabled { cursor: not-allowed; opacity: 0.38; }
 .assistant-footer { margin-top: 9px; color: #75837c; text-align: center; font-size: 9px; }
 .assistant-error { margin: 0 0 10px; color: #ffad9d; font-size: 11px; line-height: 1.5; }
 .assistant-diagnostics { margin-top: 7px; font-size: 10px; color: #8b978f; }
